@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Berries">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#101a20">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Berry Bushes and the Grabby Bird</title>
+<style>
+  :root{
+    --ink:#22303a;
+    --paper:#fdf6e7;
+    --leaf:#2f7d5b;
+    --sky:#bfe3f2;
+    --teal:#1f8fa6;
+    --plum:#a3459b;
+    --star:#f2b705;
+    --alert:#d94f3d;
+    --u:8px;              /* 1u = 1% of stage height; set by JS */
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;width:100%;overflow:hidden;background:#101a20;position:fixed;
+    inset:0;overscroll-behavior:none;
+    font-family:"Baloo 2","Comic Sans MS","Trebuchet MS",system-ui,sans-serif;color:var(--ink);
+    touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  #fit{position:absolute;inset:0;display:grid;place-items:center}
+  #stage{position:relative;width:1280px;height:800px;
+    background:linear-gradient(#dff1fa 0%,#eaf7ef 58%,#d8ecd3 100%);
+    overflow:hidden;transform-origin:center center;border-radius:14px}
+  .hill{position:absolute;bottom:0;width:140%;left:-20%;height:calc(var(--u)*35);background:#bfe0b4;border-radius:50% 50% 0 0}
+  .hill.back{height:calc(var(--u)*42);background:#cfe8c6;bottom:0}
+
+  /* ---------- star counter ---------- */
+  #counter{position:absolute;top:calc(var(--u)*2.2);left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:calc(var(--u)*1.75);background:#fffdf5;border:6px solid #fff;
+    border-radius:80px;padding:calc(var(--u)*1) calc(var(--u)*3.5) calc(var(--u)*1) calc(var(--u)*2);
+    box-shadow:0 6px 0 rgba(0,0,0,.08)}
+  #counter svg{width:calc(var(--u)*6.5);height:calc(var(--u)*6.5)}
+  #starCount{font-size:calc(var(--u)*5.5);font-weight:800;min-width:calc(var(--u)*9.25);text-align:center;letter-spacing:-1px}
+  #counter.gain{animation:pop .45s ease}
+  #counter.lose{animation:shake .5s ease}
+  @keyframes pop{50%{transform:translateX(-50%) scale(1.12)}}
+  @keyframes shake{10%,50%,90%{transform:translateX(-50%) rotate(-3deg)}30%,70%{transform:translateX(-50%) rotate(3deg)}}
+
+  /* ---------- bushes ---------- */
+  .bush{position:absolute;bottom:calc(var(--u)*8.75);width:calc(var(--u)*41);height:calc(var(--u)*41);
+    cursor:pointer;display:grid;place-items:center;transition:transform .12s ease}
+  #bushL{left:calc(var(--u)*9)} #bushR{right:calc(var(--u)*9)}
+  .bush svg{width:100%;height:100%;pointer-events:none}
+  .bush.busy{opacity:.92}
+  .bush.shake svg{animation:wobble .25s ease-in-out 2}
+  @keyframes wobble{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+  .bush:active{transform:scale(.97)}
+  .timer{position:absolute;bottom:calc(var(--u)*1.75);width:calc(var(--u)*23);height:calc(var(--u)*2);border-radius:12px;background:#ffffffaa;overflow:hidden;opacity:0}
+  .timer i{display:block;height:100%;width:0;background:var(--leaf)}
+  .bush.busy .timer{opacity:1}
+
+  /* ---------- bird cue ---------- */
+  #cue{position:absolute;top:calc(var(--u)*17);left:50%;transform:translate(-50%,calc(var(--u)*-5));
+    width:calc(var(--u)*37);height:calc(var(--u)*28);
+    opacity:0;transition:opacity .25s ease, transform .25s ease;pointer-events:none}
+  #cue.show{opacity:1;transform:translate(-50%,0)}
+  #cue svg{width:100%;height:100%}
+  #cueClock{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--u)*-1);
+    width:calc(var(--u)*26);height:calc(var(--u)*1.75);background:#ffffffcc;border-radius:10px;overflow:hidden}
+  #cueClock i{display:block;height:100%;width:100%;background:var(--alert)}
+
+  /* ---------- flying star / theft ---------- */
+  .fly{position:absolute;width:calc(var(--u)*7);height:calc(var(--u)*7);pointer-events:none;z-index:5}
+
+  /* ---------- overlays ---------- */
+  .screen{position:absolute;inset:0;background:var(--paper);display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:calc(var(--u)*3);padding:calc(var(--u)*6);
+    text-align:center;z-index:20}
+  .screen.on{display:flex}
+  .screen h1{font-size:calc(var(--u)*6.4);margin:0;font-weight:800;line-height:1.1}
+  .screen p{font-size:calc(var(--u)*3.6);margin:0;max-width:calc(var(--u)*100);line-height:1.45}
+  .say{font-size:calc(var(--u)*3);background:#fff;border:3px dashed #d8cfb8;border-radius:18px;
+    padding:calc(var(--u)*2) calc(var(--u)*3);max-width:calc(var(--u)*106)}
+  .say b{display:block;font-size:calc(var(--u)*2.1);letter-spacing:.4px;color:#8a7f66;margin-bottom:6px;font-weight:700}
+  button.go{font:inherit;font-size:calc(var(--u)*3.6);font-weight:800;color:#fff;background:var(--leaf);border:none;
+    border-radius:60px;padding:calc(var(--u)*2.4) calc(var(--u)*6);box-shadow:0 6px 0 #1f5c41;cursor:pointer}
+  button.go:active{transform:translateY(4px);box-shadow:0 2px 0 #1f5c41}
+  button.ghost{font:inherit;font-size:20px;background:none;border:2px solid #c9bfa6;border-radius:40px;padding:10px 24px;cursor:pointer}
+  .pickRow{display:flex;gap:calc(var(--u)*6);align-items:flex-end;justify-content:center;flex-wrap:wrap}
+  .pick{background:#fff;border:6px solid #fff;border-radius:26px;padding:14px;cursor:pointer;
+    box-shadow:0 6px 0 rgba(0,0,0,.08)}
+  .pick svg{width:calc(var(--u)*25);height:calc(var(--u)*25);display:block;pointer-events:none}
+  .pick.sel{border-color:var(--leaf)}
+  .faces{display:flex;gap:calc(var(--u)*3)}
+  .face{width:calc(var(--u)*13);height:calc(var(--u)*13);border-radius:50%;background:#fff;border:6px solid #fff;
+    cursor:pointer;display:grid;place-items:center;box-shadow:0 6px 0 rgba(0,0,0,.08)}
+  .face svg{width:calc(var(--u)*10);height:calc(var(--u)*10);pointer-events:none}
+  .face.sel{border-color:var(--teal)}
+
+  /* ---------- experimenter panel ---------- */
+  #panel{position:fixed;inset:0;background:#0d1b23f2;color:#e8f2f5;z-index:60;display:none;touch-action:auto;-webkit-overflow-scrolling:touch;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;padding:34px;overflow:auto}
+  #panel.on{display:block}
+  #panel h2{margin:0 0 18px;font-size:22px}
+  #panel label{display:inline-block;width:320px;margin:6px 10px 6px 0;font-size:13px}
+  #panel input,#panel select{font:inherit;font-size:13px;width:110px;padding:4px 6px;border-radius:6px;
+    border:1px solid #3d5b68;background:#12242d;color:#e8f2f5}
+  #panel .row{margin-bottom:4px}
+  #panel button{font:inherit;font-size:14px;margin:16px 10px 0 0;padding:10px 18px;border-radius:8px;
+    border:1px solid #47707f;background:#16303b;color:#e8f2f5;cursor:pointer}
+  #sessions{margin-top:16px;font-size:12px;line-height:1.8}
+  #sessions b{color:#9fd9e8}
+  #log{margin-top:18px;font-size:11px;white-space:pre-wrap;max-height:230px;overflow:auto;
+    background:#0a161c;border:1px solid #23404c;border-radius:8px;padding:10px}
+  #hint{position:fixed;right:10px;bottom:8px;color:#ffffff66;font:12px ui-monospace,monospace;z-index:50;transition:opacity .8s}
+  #corner{position:fixed;left:0;top:0;width:80px;height:80px;z-index:55}
+  #pd{position:fixed;left:0;top:0;width:60px;height:60px;background:#000;z-index:70;display:none}
+  #pd.on{display:block}
+  #pd.flash{background:#fff}
+</style>
+</head>
+<body>
+<div id="fit"><div id="stage">
+  <div class="hill back"></div><div class="hill"></div>
+
+  <div id="counter" aria-live="polite">
+    <svg viewBox="0 0 100 100"><path d="M50 6 61 38h34L67 58l10 34-27-21-27 21 10-34L5 38h34z" fill="#f2b705" stroke="#c98f00" stroke-width="4" stroke-linejoin="round"/></svg>
+    <div id="starCount">0</div>
+  </div>
+
+  <div class="bush" id="bushL"></div>
+  <div class="bush" id="bushR"></div>
+
+  <div id="cue"><div id="cueArt"></div><div id="cueClock"><i></i></div></div>
+
+  <!-- overlay screens -->
+  <div class="screen" id="scrWelcome">
+    <h1>Berry Bushes</h1>
+    <p>Tap a bush to shake it. Sometimes a star falls out. Collect as many stars as you can.</p>
+    <div class="say"><b>Read to the child</b>These are your berry bushes. When you tap one, it shakes. Sometimes a star falls out and goes in your jar. Your job is to get lots of stars. You can tap whichever bush you like, as much as you like.</div>
+    <button class="go" id="goWelcome">Start</button>
+  </div>
+
+  <div class="screen" id="scrBreak">
+    <h1 id="breakTitle">Nice work</h1>
+    <p id="breakText">Have a little rest.</p>
+    <button class="go" id="goBreak">Keep going</button>
+  </div>
+
+  <div class="screen" id="scrBirds">
+    <h1>Look out for birds</h1>
+    <p>Two birds live nearby. One of them likes to grab stars out of your jar.</p>
+    <div class="say"><b>Read to the child</b>Sometimes a bird flies down while you're picking berries. One bird is friendly and just flies past. The other bird grabs some of your stars. Keep collecting stars, and see if you can keep as many as you can.</div>
+    <button class="go" id="goBirds">Keep going</button>
+  </div>
+
+  <div class="screen" id="scrRate">
+    <h1 id="rateQ">How do you feel about this?</h1>
+    <div id="rateArt" class="pickRow"></div>
+    <div class="faces" id="faces"></div>
+    <button class="go" id="goRate" disabled style="opacity:.45">Next</button>
+  </div>
+
+  <div class="screen" id="scrReveal">
+    <h1>Here's the secret</h1>
+    <div class="pickRow" id="revealArt"></div>
+    <p id="revealText"></p>
+    <button class="go" id="goReveal">I've got it</button>
+  </div>
+
+  <div class="screen" id="scrCheck">
+    <h1 id="checkQ">Which one?</h1>
+    <div class="pickRow" id="checkArt"></div>
+    <p id="checkFeedback" style="min-height:40px"></p>
+  </div>
+
+  <div class="screen" id="scrEnd">
+    <h1>All done</h1>
+    <p id="endText">Great picking.</p>
+    <button class="go" id="goSave">Save data</button>
+    <button class="ghost" id="goRestart">New participant</button>
+  </div>
+</div></div>
+
+<div id="pd"></div>
+<div id="hint">press E, or tap the top-left corner 5 times, for the experimenter panel</div>
+<div id="corner"></div>
+
+<div id="panel">
+  <h2>Experimenter panel</h2>
+  <div id="cfgForm"></div>
+  <div>
+    <button id="btnApply">Apply and restart</button>
+    <button id="btnClose">Close (E)</button>
+    <button id="btnJSON">Download JSON</button>
+    <button id="btnCSV">Download events CSV</button>
+    <button id="btnAOI">Download AOIs</button>
+    <button id="btnConnect">Connect marker bridge</button>
+    <button id="btnUpload">Upload now</button>
+    <button id="btnSessions">Refresh saved list</button>
+  </div>
+  <div id="sessions"></div>
+  <div id="log"></div>
+</div>
+
+<script>
+/* ============================================================
+   Berry Bushes and the Grabby Bird
+   Child analogue of the conditioned punishment ("Planets and
+   Pirates") task: two freely available responses, equally and
+   independently rewarded, one of which also produces a cue that
+   precedes loss of earned reward.
+   Single file, no dependencies, touch or mouse, runs offline.
+   ============================================================ */
+
+/* ---------- configuration ---------- */
+const DEFAULTS = {
+  pid: "test",
+  rewardP: 0.50,        // p(star) per completed shake
+  shakeMs: 500,         // response -> reward outcome (short, for young children)
+  cueP: 0.45,           // p(bird | completed response) on each bush
+  cueDelayMs: 1000,     // response -> bird onset
+  cueDurMs: 3000,       // bird onset -> grab (or fly away)
+  cueLockoutMs: 2000,   // minimum gap between birds
+  lossProp: 0.35,       // proportion of the jar taken by a grab (try up to 0.50)
+  prePunishBlocks: 2,
+  punishBlocks: 3,
+  postRevealBlocks: 1,
+  blockMs: 60000,       // block duration
+  punishedSide: "auto", // left | right | auto (random)
+  cuePlusColour: "auto",// amber | slate | auto
+  rateBlocks: 2,        // ratings after every Nth block; 0 = never
+  checkOn: 1,           // 1 = two forced-choice questions after the reveal, 0 = skip
+  sound: 1,
+  photodiode: 0,        // white flash patch top-left on every marker
+  bridgeURL: "ws://localhost:8765"
+};
+let CFG = Object.assign({}, DEFAULTS);
+
+/* ---------- state ---------- */
+const S = {
+  stars: 0, phase: "idle", block: 0, blockType: "pre",
+  running: false, cueActive: false, lastCueEnd: -1e9,
+  events: [], ratings: [], checks: [], t0: performance.now(),
+  punishedSide: "left", cuePlusColour: "teal",
+  blockTimer: null, cueTimers: [], rateTarget: null, rateValue: null
+};
+
+/* ---------- utilities ---------- */
+const $ = id => document.getElementById(id);
+const now = () => performance.now() - S.t0;
+const rand = () => Math.random();
+
+function log(line){
+  const el = $("log");
+  el.textContent += line + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+
+/* marker: one row in the data file, one message to the eye tracker */
+let ws = null;
+function mark(type, data){
+  const ev = Object.assign({t: Math.round(now()), clock: Date.now(), type: type,
+    phase: S.phase, block: S.block, blockType: S.blockType, stars: S.stars}, data || {});
+  S.events.push(ev);
+  if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify(ev)); } catch(e){} }
+  if (CFG.photodiode) flashPD();
+  return ev;
+}
+function flashPD(){
+  const pd = $("pd"); pd.classList.add("flash");
+  setTimeout(()=>pd.classList.remove("flash"), 33);
+}
+function connectBridge(){
+  try{
+    ws = new WebSocket(CFG.bridgeURL);
+    ws.onopen = ()=>log("marker bridge connected: " + CFG.bridgeURL);
+    ws.onerror = ()=>log("marker bridge not available (task still runs)");
+    ws.onclose = ()=>log("marker bridge closed");
+  }catch(e){ log("bridge error: " + e.message); }
+}
+
+/* ---------- sound (generated, no asset files) ---------- */
+let actx = null;
+function beep(freq, ms, kind, gain){
+  if (!CFG.sound) return;
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = kind || "sine"; o.frequency.value = freq;
+    g.gain.value = gain == null ? 0.16 : gain;
+    o.connect(g); g.connect(actx.destination);
+    const t = actx.currentTime;
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + ms/1000);
+    o.start(t); o.stop(t + ms/1000);
+  }catch(e){}
+}
+const sndStar = () => { beep(880,120,"triangle"); setTimeout(()=>beep(1320,160,"triangle"),110); };
+const sndNone = () => beep(220,120,"sine",0.08);
+const sndCue  = () => beep(600,220,"square",0.10);
+const sndGrab = () => { beep(300,180,"sawtooth",0.14); setTimeout(()=>beep(180,320,"sawtooth",0.14),150); };
+
+/* ---------- iOS: audio needs a gesture, screen needs to stay awake ---------- */
+function unlockAudio(){
+  try{
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    const b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource();
+    s.buffer = b; s.connect(actx.destination); s.start(0);
+  }catch(e){}
+}
+let wakeLock = null;
+async function keepAwake(){
+  try{ if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+}
+
+/* ---------- artwork ---------- */
+function bushSVG(colour){
+  const berry = colour === "teal" ? "#1f8fa6" : "#a3459b";
+  const dark  = colour === "teal" ? "#15697b" : "#7a3274";
+  let berries = "";
+  const pts = [[70,120],[128,92],[186,118],[100,168],[160,164],[128,210],[74,196],[186,196]];
+  pts.forEach(p => { berries += `<circle cx="${p[0]}" cy="${p[1]}" r="17" fill="${berry}" stroke="${dark}" stroke-width="4"/>`; });
+  return `<svg viewBox="0 0 256 300" aria-hidden="true">
+    <ellipse cx="128" cy="286" rx="96" ry="14" fill="#00000012"/>
+    <path d="M128 40c52 0 96 42 96 96s-40 116-96 116-96-58-96-116 44-96 96-96z" fill="#3f9e6d" stroke="#2f7d5b" stroke-width="6"/>
+    <path d="M128 252v34" stroke="#7a5a3a" stroke-width="12" stroke-linecap="round"/>
+    ${berries}</svg>`;
+}
+function birdSVG(colour){            // birds use their own palette, never the bush colours
+  const body = colour === "amber" ? "#e08a1e" : "#6a7b8c";
+  const wing = colour === "amber" ? "#ffd08a" : "#c3ced9";
+  return `<svg viewBox="0 0 300 230" aria-hidden="true">
+    <ellipse cx="150" cy="214" rx="78" ry="10" fill="#00000010"/>
+    <path d="M150 34c56 0 96 42 96 92 0 46-42 76-96 76s-96-30-96-76c0-50 40-92 96-92z" fill="${body}" stroke="#123c47" stroke-width="6"/>
+    <path d="M96 118c30-26 78-26 108 0-24 44-84 44-108 0z" fill="${wing}" stroke="#123c47" stroke-width="5"/>
+    <circle cx="118" cy="96" r="15" fill="#fff" stroke="#123c47" stroke-width="4"/>
+    <circle cx="118" cy="98" r="7" fill="#123c47"/>
+    <circle cx="182" cy="96" r="15" fill="#fff" stroke="#123c47" stroke-width="4"/>
+    <circle cx="182" cy="98" r="7" fill="#123c47"/>
+    <path d="M136 124h28l-14 20z" fill="#f2b705" stroke="#c98f00" stroke-width="4" stroke-linejoin="round"/>
+  </svg>`;
+}
+const otherBird = () => (S.cuePlusColour === "amber" ? "slate" : "amber");
+const starSVG = `<svg viewBox="0 0 100 100"><path d="M50 6 61 38h34L67 58l10 34-27-21-27 21 10-34L5 38h34z" fill="#f2b705" stroke="#c98f00" stroke-width="4" stroke-linejoin="round"/></svg>`;
+function faceSVG(level){ // 1 = sad ... 5 = happy
+  const mouths = ["M30 74q22-22 44 0","M30 70q22-12 44 0","M30 66h44","M30 62q22 12 44 0","M30 58q22 26 44 0"];
+  return `<svg viewBox="0 0 104 104"><circle cx="52" cy="52" r="46" fill="#ffe08a" stroke="#c98f00" stroke-width="5"/>
+    <circle cx="36" cy="42" r="6" fill="#4a3a12"/><circle cx="68" cy="42" r="6" fill="#4a3a12"/>
+    <path d="${mouths[level-1]}" fill="none" stroke="#4a3a12" stroke-width="6" stroke-linecap="round"/></svg>`;
+}
+
+/* ---------- layout helpers ---------- */
+function viewport(){
+  const v = window.visualViewport;
+  return {w: v ? v.width : window.innerWidth, h: v ? v.height : window.innerHeight};
+}
+function stageDims(){
+  const wide = {w: 1280, h: 800}, ipad = {w: 1024, h: 768};
+  if (CFG.screenShape === "wide") return wide;
+  if (CFG.screenShape === "ipad") return ipad;
+  const vp = viewport();
+  return (vp.w / vp.h) < 1.45 ? ipad : wide;     // auto: 4:3 tablets get the squarer stage
+}
+function fitStage(){
+  const st = $("stage"), d = stageDims(), vp = viewport();
+  st.style.width = d.w + "px"; st.style.height = d.h + "px";
+  st.style.setProperty("--u", (d.h / 100) + "px");
+  const s = Math.min(vp.w / d.w, vp.h / d.h);
+  st.style.transform = "scale(" + s + ")";
+  return s;
+}
+function aoiTable(){
+  const ids = ["bushL","bushR","cue","counter"];
+  const dpr = window.devicePixelRatio || 1;
+  return ids.map(id => {
+    const r = $(id).getBoundingClientRect();
+    return {aoi: id, screen_x: Math.round(r.left*dpr), screen_y: Math.round(r.top*dpr),
+      screen_w: Math.round(r.width*dpr), screen_h: Math.round(r.height*dpr),
+      css_x: Math.round(r.left), css_y: Math.round(r.top),
+      css_w: Math.round(r.width), css_h: Math.round(r.height),
+      note: id === "bushL" ? (S.punishedSide === "left" ? "punished bush" : "safe bush")
+          : id === "bushR" ? (S.punishedSide === "right" ? "punished bush" : "safe bush")
+          : id === "cue" ? "bird cue (both CS+ and CS- appear here)" : "star jar"};
+  });
+}
+
+/* ---------- screens ---------- */
+const SCREENS = ["scrWelcome","scrBreak","scrBirds","scrRate","scrReveal","scrCheck","scrEnd"];
+function show(id){ SCREENS.forEach(s => $(s).classList.toggle("on", s === id)); }
+function hideAll(){ SCREENS.forEach(s => $(s).classList.remove("on")); }
+
+/* ---------- task setup ---------- */
+function setup(){
+  S.punishedSide = CFG.punishedSide === "auto" ? (rand() < 0.5 ? "left" : "right") : CFG.punishedSide;
+  S.cuePlusColour = CFG.cuePlusColour === "auto" ? (rand() < 0.5 ? "amber" : "slate") : CFG.cuePlusColour;
+  S.stars = 0; S.block = 0; S.events = []; S.ratings = []; S.checks = [];
+  S.t0 = performance.now(); S.cueActive = false; S.lastCueEnd = -1e9;
+  S.sessionKey = CFG.pid + "_" + new Date().toISOString().slice(0,19).replace(/[:T]/g,"-");
+  // bush colours: punished bush always gets its own colour, counterbalanced with cue colour
+  const leftColour = "teal", rightColour = "plum";
+  $("bushL").innerHTML = bushSVG(leftColour) + '<div class="timer"><i></i></div>';
+  $("bushR").innerHTML = bushSVG(rightColour) + '<div class="timer"><i></i></div>';
+  $("bushL").dataset.colour = leftColour; $("bushR").dataset.colour = rightColour;
+  $("starCount").textContent = "0";
+  $("pd").classList.toggle("on", !!CFG.photodiode);
+  mark("setup", {punishedSide: S.punishedSide, cuePlusColour: S.cuePlusColour, cfg: JSON.stringify(CFG)});
+  log("participant " + CFG.pid + " | punished bush: " + S.punishedSide + " | CS+ bird: " + S.cuePlusColour);
+}
+
+/* ---------- responses ---------- */
+function bushTap(side){
+  if (!S.running) return;
+  const el = $(side === "left" ? "bushL" : "bushR");
+  if (el.classList.contains("busy")) { mark("tap_ignored", {side: side}); return; }
+  const punished = (side === S.punishedSide);
+  mark("response", {side: side, punished: punished ? 1 : 0});
+
+  el.classList.add("busy","shake");
+  const bar = el.querySelector(".timer i");
+  bar.style.transition = "none"; bar.style.width = "0%";
+  requestAnimationFrame(() => {
+    bar.style.transition = "width " + CFG.shakeMs + "ms linear";
+    bar.style.width = "100%";
+  });
+
+  setTimeout(() => {
+    el.classList.remove("busy","shake");
+    const won = rand() < CFG.rewardP;
+    if (won){ addStars(1, el); mark("reward", {side: side}); sndStar(); }
+    else { mark("no_reward", {side: side}); sndNone(); }
+  }, CFG.shakeMs);
+
+  // punishment contingency: only in punishment blocks, only on the punished bush
+  if (S.blockType !== "pre" && punished && !S.cueActive &&
+      (now() - S.lastCueEnd) > CFG.cueLockoutMs && rand() < CFG.cueP){
+    const t = setTimeout(() => runCue(true), CFG.cueDelayMs);
+    S.cueTimers.push(t);
+  }
+  // matched safe cue so that the two bushes differ only in what the bird does
+  if (S.blockType !== "pre" && !punished && !S.cueActive &&
+      (now() - S.lastCueEnd) > CFG.cueLockoutMs && rand() < CFG.cueP){
+    const t = setTimeout(() => runCue(false), CFG.cueDelayMs);
+    S.cueTimers.push(t);
+  }
+}
+
+function addStars(n, fromEl){
+  S.stars += n;
+  $("starCount").textContent = S.stars;
+  $("counter").classList.remove("gain"); void $("counter").offsetWidth;
+  $("counter").classList.add("gain");
+  if (fromEl) flyStar(fromEl);
+}
+function flyStar(fromEl){
+  const st = $("stage").getBoundingClientRect(), a = fromEl.getBoundingClientRect(), b = $("counter").getBoundingClientRect();
+  const scale = st.width / $("stage").offsetWidth;
+  const d = document.createElement("div"); d.className = "fly"; d.innerHTML = starSVG;
+  const bw = a.width/scale, bh = a.height/scale;
+  d.style.left = ((a.left - st.left)/scale + bw/2 - 28) + "px";
+  d.style.top  = ((a.top  - st.top )/scale + bh*0.2) + "px";
+  d.style.transition = "transform .6s cubic-bezier(.4,0,.3,1), opacity .6s";
+  $("stage").appendChild(d);
+  const dx = ((b.left - a.left)/scale) + 20, dy = ((b.top - a.top)/scale) - 40;
+  requestAnimationFrame(() => { d.style.transform = `translate(${dx}px,${dy}px) scale(.6)`; d.style.opacity = ".2"; });
+  setTimeout(() => d.remove(), 700);
+}
+
+/* ---------- the bird ---------- */
+function runCue(isPlus){
+  if (!S.running || S.cueActive) return;
+  S.cueActive = true;
+  const colour = isPlus ? S.cuePlusColour : otherBird();
+  $("cueArt").innerHTML = birdSVG(colour);
+  $("cue").classList.add("show");
+  const clock = document.querySelector("#cueClock i");
+  clock.style.transition = "none"; clock.style.width = "100%";
+  requestAnimationFrame(() => {
+    clock.style.transition = "width " + CFG.cueDurMs + "ms linear";
+    clock.style.width = "0%";
+  });
+  mark("cue_on", {cue: isPlus ? "CS+" : "CS-", colour: colour});
+  sndCue();
+
+  const t = setTimeout(() => {
+    $("cue").classList.remove("show");
+    if (isPlus){
+      const lost = Math.max(1, Math.round(S.stars * CFG.lossProp));
+      const taken = Math.min(lost, S.stars);
+      S.stars -= taken;
+      $("starCount").textContent = S.stars;
+      $("counter").classList.remove("lose"); void $("counter").offsetWidth;
+      $("counter").classList.add("lose");
+      mark("grab", {starsTaken: taken});
+      sndGrab();
+    } else {
+      mark("flyby", {});
+    }
+    S.cueActive = false; S.lastCueEnd = now();
+  }, CFG.cueDurMs);
+  S.cueTimers.push(t);
+}
+
+/* ---------- blocks ---------- */
+function startBlock(type){
+  S.blockType = type; S.block += 1; S.phase = "block";
+  hideAll(); S.running = true;
+  mark("block_start", {});
+  mark("aoi", {aois: JSON.stringify(aoiTable())});
+  S.blockTimer = setTimeout(endBlock, CFG.blockMs);
+}
+function endBlock(){
+  S.running = false;
+  S.cueTimers.forEach(clearTimeout); S.cueTimers = [];
+  $("cue").classList.remove("show"); S.cueActive = false;
+  mark("block_end", {});
+  autosave();
+  nextStep();
+}
+
+/* ---------- ratings (5 faces) ---------- */
+function askRatings(queue, done){
+  if (!queue.length) { done(); return; }
+  const item = queue.shift();
+  S.phase = "rating";
+  $("rateQ").textContent = item.q;
+  $("rateArt").innerHTML = '<div class="pick" style="cursor:default">' + item.art + '</div>';
+  const faces = $("faces"); faces.innerHTML = "";
+  S.rateValue = null;
+  for (let i = 1; i <= 5; i++){
+    const b = document.createElement("div");
+    b.className = "face"; b.innerHTML = faceSVG(i);
+    b.onclick = () => {
+      [...faces.children].forEach(c => c.classList.remove("sel"));
+      b.classList.add("sel"); S.rateValue = i;
+      $("goRate").disabled = false; $("goRate").style.opacity = 1;
+    };
+    faces.appendChild(b);
+  }
+  $("goRate").disabled = true; $("goRate").style.opacity = .45;
+  $("goRate").onclick = () => {
+    S.ratings.push({block: S.block, blockType: S.blockType, target: item.key, value: S.rateValue, t: Math.round(now())});
+    mark("rating", {target: item.key, value: S.rateValue});
+    askRatings(queue, done);
+  };
+  show("scrRate");
+}
+function ratingQueue(){
+  const safeSide = S.punishedSide === "left" ? "right" : "left";
+  const punColour = $(S.punishedSide === "left" ? "bushL" : "bushR").dataset.colour;
+  const safColour = $(safeSide === "left" ? "bushL" : "bushR").dataset.colour;
+  const csMinus = otherBird();
+  const q = [
+    {key: "bush_punished", q: "How do you feel about this bush?", art: bushSVG(punColour)},
+    {key: "bush_safe",     q: "How do you feel about this bush?", art: bushSVG(safColour)}
+  ];
+  if (S.blockType !== "pre"){
+    q.push({key: "cue_plus",  q: "How do you feel about this bird?", art: birdSVG(S.cuePlusColour)});
+    q.push({key: "cue_minus", q: "How do you feel about this bird?", art: birdSVG(csMinus)});
+  }
+  return q.sort(() => rand() - 0.5);
+}
+
+/* ---------- contingency reveal + check ---------- */
+function doReveal(){
+  S.phase = "reveal";
+  const punColour = $(S.punishedSide === "left" ? "bushL" : "bushR").dataset.colour;
+  const csMinus = otherBird();
+  $("revealArt").innerHTML =
+    '<div class="pick" style="cursor:default">' + bushSVG(punColour) + '</div>' +
+    '<div style="font-size:56px;align-self:center">&rarr;</div>' +
+    '<div class="pick" style="cursor:default">' + birdSVG(S.cuePlusColour) + '</div>' +
+    '<div style="font-size:56px;align-self:center">&rarr;</div>' +
+    '<div class="pick" style="cursor:default;position:relative">' + starSVG +
+      '<svg viewBox="0 0 100 100" style="position:absolute;right:6px;bottom:6px;width:74px;height:74px">' +
+      '<circle cx="50" cy="50" r="34" fill="#d94f3d" stroke="#fff" stroke-width="7"/>' +
+      '<rect x="30" y="43" width="40" height="14" rx="7" fill="#fff"/></svg></div>';
+  $("revealText").textContent = "Tapping this bush calls this bird, and this bird takes your stars. The other bush and the other bird never take stars.";
+  mark("reveal", {});
+  show("scrReveal");
+  $("goReveal").onclick = () => runCheck(0);
+}
+const CHECKS = [
+  {key: "which_bush", q: "Which bush brings the star-taking bird?", kind: "bush"},
+  {key: "which_bird", q: "Which bird takes your stars?", kind: "bird"}
+];
+function runCheck(i){
+  if (!CFG.checkOn || i >= CHECKS.length){ nextStep(); return; }
+  S.phase = "check";
+  const c = CHECKS[i];
+  const punColour = $(S.punishedSide === "left" ? "bushL" : "bushR").dataset.colour;
+  const safColour = punColour === "teal" ? "plum" : "teal";
+  const csMinus = otherBird();
+  const opts = c.kind === "bush"
+    ? [{art: bushSVG(punColour), correct: 1, label: punColour}, {art: bushSVG(safColour), correct: 0, label: safColour}]
+    : [{art: birdSVG(S.cuePlusColour), correct: 1, label: S.cuePlusColour}, {art: birdSVG(csMinus), correct: 0, label: csMinus}];
+  opts.sort(() => rand() - 0.5);
+  $("checkQ").textContent = c.q;
+  $("checkFeedback").textContent = "";
+  $("checkArt").innerHTML = "";
+  let attempts = 0, resolved = false;
+  opts.forEach(o => {
+    const d = document.createElement("div");
+    d.className = "pick"; d.innerHTML = o.art;
+    d.onclick = () => {
+      if (resolved) return;          // ignore extra taps while feedback is showing
+      attempts++;
+      S.checks.push({item: c.key, chosen: o.label, correct: o.correct, attempt: attempts, t: Math.round(now())});
+      mark("check", {item: c.key, chosen: o.label, correct: o.correct, attempt: attempts});
+      if (o.correct){
+        resolved = true;
+        $("checkFeedback").textContent = "That's the one.";
+        setTimeout(() => runCheck(i+1), 900);
+      } else if (attempts >= 2){
+        resolved = true;
+        $("checkFeedback").textContent = "It's this one.";
+        const right = [...$("checkArt").children][opts.findIndex(x => x.correct === 1)];
+        if (right) right.classList.add("sel");
+        setTimeout(() => runCheck(i+1), 1600);
+      } else {
+        $("checkFeedback").textContent = "Have another look.";
+      }
+    };
+    $("checkArt").appendChild(d);
+  });
+  show("scrCheck");
+}
+
+/* ---------- flow ---------- */
+let plan = [];
+function buildPlan(){
+  plan = [];
+  plan.push({do: "welcome"});
+  for (let i = 0; i < CFG.prePunishBlocks; i++){ plan.push({do: "block", type: "pre"}); plan.push({do: "rate"}); }
+  plan.push({do: "birds"});
+  for (let i = 0; i < CFG.punishBlocks; i++){ plan.push({do: "block", type: "punish"}); plan.push({do: "rate"}); }
+  plan.push({do: "reveal"});
+  for (let i = 0; i < CFG.postRevealBlocks; i++){ plan.push({do: "block", type: "post"}); plan.push({do: "rate"}); }
+  plan.push({do: "end"});
+}
+let step = -1;
+function nextStep(){
+  step++;
+  const s = plan[step];
+  if (!s) return;
+  if (s.do === "welcome"){ S.phase = "welcome"; show("scrWelcome"); }
+  else if (s.do === "block"){
+    const prev = plan[step-1] ? plan[step-1].do : "";
+    const noBreak = (prev === "welcome" || prev === "birds" || prev === "reveal");
+    if (step > 1 && !noBreak){ // short break screen before each block after the first
+      S.phase = "break";
+      $("breakTitle").textContent = "Nice picking";
+      $("breakText").textContent = "Ready for some more?";
+      show("scrBreak");
+      $("goBreak").onclick = () => startBlock(s.type);
+    } else { startBlock(s.type); }
+  }
+  else if (s.do === "rate"){
+    const doRate = CFG.rateBlocks > 0 && (S.block % CFG.rateBlocks === 0);
+    if (doRate) askRatings(ratingQueue(), nextStep); else nextStep();
+  }
+  else if (s.do === "birds"){ S.phase = "birds"; show("scrBirds"); }
+  else if (s.do === "reveal"){ doReveal(); }
+  else if (s.do === "end"){
+    S.phase = "end";
+    $("endText").textContent = "You collected " + S.stars + " stars.";
+    mark("task_end", {finalStars: S.stars});
+    autosave();
+    if (CFG.uploadURL) uploadNow();
+    show("scrEnd");
+  }
+}
+
+/* ---------- data out ---------- */
+function download(name, text, mime){
+  const b = new Blob([text], {type: mime || "text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function stamp(){ return S.sessionKey || (CFG.pid + "_" + new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")); }
+function snapshot(){
+  return {pid: CFG.pid, savedAt: new Date().toISOString(), config: CFG,
+    counterbalance: {punishedSide: S.punishedSide, cuePlusColour: S.cuePlusColour},
+    events: S.events, ratings: S.ratings, checks: S.checks, aois: aoiTable()};
+}
+/* keeps a copy on the device after every block, so nothing is lost if the app closes */
+function autosave(){
+  try{ localStorage.setItem("berrySession_" + stamp(), JSON.stringify(snapshot())); }catch(e){}
+}
+async function shareOrDownload(name, text, mime){
+  try{
+    if (window.File && navigator.canShare){
+      const f = new File([text], name, {type: mime});
+      if (navigator.canShare({files: [f]})){ await navigator.share({files: [f], title: name}); return "shared"; }
+    }
+  }catch(e){ /* user cancelled or unsupported: fall through */ }
+  download(name, text, mime); return "downloaded";
+}
+function saveJSON(){ return shareOrDownload("berry_" + stamp() + ".json", JSON.stringify(snapshot(), null, 1), "application/json"); }
+async function uploadNow(){
+  if (!CFG.uploadURL) { log("no uploadURL set"); return "no url"; }
+  try{
+    const r = await fetch(CFG.uploadURL, {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(snapshot())});
+    log("upload: " + r.status); return "uploaded";
+  }catch(e){ log("upload failed: " + e.message); return "failed"; }
+}
+function listSessions(){
+  const box = $("sessions"); box.innerHTML = "<b>Saved on this device</b><br>";
+  const keys = Object.keys(localStorage).filter(k => k.indexOf("berrySession_") === 0).sort().reverse();
+  if (!keys.length){ box.innerHTML += "(none)"; return; }
+  keys.forEach(k => {
+    const row = document.createElement("div");
+    const name = k.replace("berrySession_","");
+    let n = 0; try{ n = JSON.parse(localStorage.getItem(k)).events.length; }catch(e){}
+    row.innerHTML = name + " &nbsp;(" + n + " events) ";
+    const get = document.createElement("button"); get.textContent = "export";
+    get.onclick = () => shareOrDownload("berry_" + name + ".json", localStorage.getItem(k), "application/json");
+    const del = document.createElement("button"); del.textContent = "delete";
+    del.onclick = () => { if (confirm("Delete " + name + "?")){ localStorage.removeItem(k); listSessions(); } };
+    row.appendChild(get); row.appendChild(del); box.appendChild(row);
+  });
+}
+function saveCSV(){
+  const cols = ["t","clock","type","phase","block","blockType","stars","side","punished","cue","colour","starsTaken","target","value","item","chosen","correct","attempt"];
+  const rows = [cols.join(",")].concat(S.events.map(e =>
+    cols.map(c => e[c] === undefined ? "" : String(e[c]).replace(/[",\n]/g," ")).join(",")));
+  download("berry_events_" + stamp() + ".csv", rows.join("\n"), "text/csv");
+}
+function saveAOI(){
+  const a = aoiTable();
+  const cols = Object.keys(a[0]);
+  download("berry_aoi_" + stamp() + ".csv",
+    [cols.join(",")].concat(a.map(r => cols.map(c => r[c]).join(","))).join("\n"), "text/csv");
+}
+
+/* ---------- experimenter panel ---------- */
+function buildPanel(){
+  const f = $("cfgForm"); f.innerHTML = "";
+  Object.keys(DEFAULTS).forEach(k => {
+    const row = document.createElement("div"); row.className = "row";
+    const lab = document.createElement("label"); lab.textContent = k;
+    let inp;
+    if (k === "punishedSide" || k === "cuePlusColour"){
+      inp = document.createElement("select");
+      const opts = k === "punishedSide" ? ["auto","left","right"] : ["auto","amber","slate"];
+      opts.forEach(o => { const op = document.createElement("option"); op.value = o; op.textContent = o; inp.appendChild(op); });
+    } else {
+      inp = document.createElement("input");
+      inp.type = (typeof DEFAULTS[k] === "number") ? "number" : "text";
+      if (typeof DEFAULTS[k] === "number") inp.step = "any";
+      if (k === "bridgeURL" || k === "pid") inp.style.width = "230px";
+    }
+    inp.id = "cfg_" + k; inp.value = CFG[k];
+    lab.appendChild(document.createElement("br")); lab.appendChild(inp);
+    row.appendChild(lab); f.appendChild(row);
+  });
+}
+function readPanel(){
+  Object.keys(DEFAULTS).forEach(k => {
+    const el = $("cfg_" + k); if (!el) return;
+    CFG[k] = (typeof DEFAULTS[k] === "number") ? parseFloat(el.value) : el.value;
+  });
+  try{ localStorage.setItem("berryCFG", JSON.stringify(CFG)); }catch(e){}
+}
+
+/* ---------- boot ---------- */
+function restart(){
+  S.cueTimers.forEach(clearTimeout); clearTimeout(S.blockTimer);
+  S.cueTimers = []; S.running = false;
+  setup(); buildPlan(); step = -1; nextStep();
+}
+function init(){
+  try{ const saved = localStorage.getItem("berryCFG"); if (saved) CFG = Object.assign({}, DEFAULTS, JSON.parse(saved)); }catch(e){}
+  buildPanel();
+  fitStage(); window.addEventListener("resize", fitStage);
+
+  const TOUCH = ("ontouchstart" in window);
+  ["bushL","bushR"].forEach(id => {
+    const el = $(id);
+    const side = id === "bushL" ? "left" : "right";
+    const fire = ev => { ev.preventDefault(); unlockAudio(); bushTap(side); };
+    if (TOUCH) el.addEventListener("touchstart", fire, {passive: false});
+    else el.addEventListener("pointerdown", fire);
+  });
+  // stop iOS zooming, scrolling, text selection and the magnifier mid-task
+  ["gesturestart","gesturechange","gestureend","dblclick","contextmenu"].forEach(evt =>
+    document.addEventListener(evt, e => e.preventDefault(), {passive: false}));
+  document.addEventListener("touchmove", e => {
+    if (!(e.target.closest && e.target.closest("#panel"))) e.preventDefault();
+  }, {passive: false});
+  document.addEventListener("touchstart", unlockAudio, {once: true});
+  document.addEventListener("pointerdown", unlockAudio, {once: true});
+  keepAwake();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible"){ keepAwake(); fitStage(); }
+  });
+  window.addEventListener("orientationchange", () => setTimeout(fitStage, 250));
+  if (window.visualViewport) visualViewport.addEventListener("resize", fitStage);
+
+  $("goWelcome").onclick = nextStep;
+  $("goBirds").onclick = nextStep;
+  $("goSave").onclick = async () => {
+    $("endText").textContent = "Saving…";
+    const how = await saveJSON();
+    saveCSV();
+    const up = CFG.uploadURL ? (" + " + await uploadNow()) : "";
+    $("endText").textContent = "Data " + how + up + ". A copy is kept on this device (panel \u2192 saved list).";
+  };
+  $("goRestart").onclick = restart;
+  $("btnApply").onclick = () => { readPanel(); $("panel").classList.remove("on"); restart(); };
+  $("btnClose").onclick = () => $("panel").classList.remove("on");
+  $("btnJSON").onclick = saveJSON;
+  $("btnCSV").onclick = saveCSV;
+  $("btnAOI").onclick = saveAOI;
+  $("btnConnect").onclick = () => { readPanel(); connectBridge(); };
+  $("btnUpload").onclick = () => { readPanel(); uploadNow(); };
+  $("btnSessions").onclick = listSessions;
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "e" || e.key === "E"){ $("panel").classList.toggle("on"); buildPanel(); listSessions(); }
+    if (e.key === "Escape"){ $("panel").classList.remove("on"); }
+  });
+
+  let taps = 0, tapTimer = null;
+  $("corner").addEventListener("pointerdown", () => {
+    taps++; clearTimeout(tapTimer); tapTimer = setTimeout(() => taps = 0, 1500);
+    if (taps >= 5){ taps = 0; $("panel").classList.add("on"); buildPanel(); listSessions(); }
+  });
+
+  setTimeout(() => { $("hint").style.opacity = 0; }, 6000);   // keep the screen clean for the child
+  restart();
+}
+window.addEventListener("load", init);
+
+/* offline support: after the first visit the task runs with no network at all */
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
